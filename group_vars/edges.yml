@@ -19,6 +19,6 @@ services:
     # Edge binary is interactive - needs dir name
     stdin_input: "{{ edge_name }}"
 
-# Edge requires heavy ML dependencies
+# Edge requires heavy ML dependencies (TensorFlow ~500MB, PyTorch ~2GB, Ultralytics ~200MB)
 python_requirements_file: "{{ playbook_dir }}/../requirements/edge-requirements.txt"
-pip_install_timeout: 600  # 10 min for CPU PyTorch download
+pip_install_timeout: 1800  # 30 min for massive ML packages

@@ -2,6 +2,9 @@
 - name: Stop IPD services
   hosts: all
   become: yes
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/edges.yml
   tasks:
     - name: Stop services
       systemd:

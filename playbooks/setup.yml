@@ -2,6 +2,8 @@
 - name: Setup Python 3.12 and Go 1.22 on all nodes
   hosts: all
   become: yes
+  vars_files:
+    - ../group_vars/all.yml
   tasks:
     - name: Install required system packages
       apt:

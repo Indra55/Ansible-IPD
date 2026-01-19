@@ -2,6 +2,9 @@
 - name: Deploy IPD project to all nodes
   hosts: all
   become: yes
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/edges.yml
   vars:
     project_dest: "{{ app_base_dir }}/project"
   tasks:
@@ -55,21 +58,28 @@
       become_user: "{{ app_user }}"
       when: node_role == 'controller'
 
-    # For edges - install from requirements.txt (includes torch)
-    - name: Install Python requirements (edges)
+    # For edges - install from requirements.txt (includes torch, tensorflow, ultralytics ~3GB total)
+    - name: "Installing Python requirements... (this may take 15-30 min for ML packages)"
       pip:
         requirements: "{{ python_requirements_file }}"
         virtualenv: "{{ venv_dir }}"
-        extra_args: "--timeout {{ pip_install_timeout }}"
+        extra_args: "--timeout {{ pip_install_timeout }} --no-cache-dir"
       become_user: "{{ app_user }}"
       when: node_role == 'edge'
-      async: 900  # 15 minute timeout for CPU torch
-      poll: 15
+      async: 3600  # 1 hour max - prevents Ansible SSH timeout
+      poll: 30     # Check every 30 seconds
+      register: pip_result
+
+    - name: Show pip install result
+      debug:
+        msg: "✅ Pip install completed successfully!"
+      when: node_role == 'edge' and pip_result is defined
 
     - name: Build Go binaries
       shell: |
         source /etc/profile.d/go.sh
         cd {{ project_dest }}
+        go mod tidy
         go mod download
         {% for svc in services if svc.type == 'go' %}
         go build -o {{ svc.binary }} {{ svc.build_path }}
@@ -81,7 +91,7 @@
 
     - name: Create edge startup script
       template:
-        src: "templates/edge_start.sh.j2"
+        src: "../templates/edge_start.sh.j2"
         dest: "{{ app_base_dir }}/edge_start.sh"
         mode: '0755'
         owner: "{{ app_user }}"
@@ -90,7 +100,7 @@
 
     - name: Create systemd service files
       template:
-        src: "templates/{{ item.name }}.service.j2"
+        src: "../templates/{{ item.name }}.service.j2"
         dest: "/etc/systemd/system/{{ item.name }}.service"
         mode: '0644'
       loop: "{{ services }}"
