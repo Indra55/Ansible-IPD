@@ -1,0 +1,24 @@
+---
+node_role: edge
+# Edge name will be the ansible hostname (edge1, edge2, etc.)
+edge_name: "{{ inventory_hostname }}"
+
+services:
+  - name: ml_trainer
+    description: "IPD ML Trainer Service"
+    type: python
+    script: edge/process_images.py
+    port: 8765
+    working_dir: "{{ app_base_dir }}/project"
+  - name: edge
+    description: "IPD Edge Node Service"
+    type: go
+    binary: edge_node
+    build_path: ./edge/
+    working_dir: "{{ app_base_dir }}/project"
+    # Edge binary is interactive - needs dir name
+    stdin_input: "{{ edge_name }}"
+
+# Edge requires heavy ML dependencies
+python_requirements_file: "{{ playbook_dir }}/../requirements/edge-requirements.txt"
+pip_install_timeout: 600  # 10 min for CPU PyTorch download

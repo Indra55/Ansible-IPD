@@ -1,0 +1,87 @@
+---
+- name: Setup Python 3.12 and Go 1.22 on all nodes
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install required system packages
+      apt:
+        name:
+          - software-properties-common
+          - curl
+          - git
+          - build-essential
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Add deadsnakes PPA for Python 3.12
+      apt_repository:
+        repo: ppa:deadsnakes/ppa
+        state: present
+
+    - name: Install Python 3.12
+      apt:
+        name:
+          - python3.12
+          - python3.12-venv
+          - python3.12-dev
+        state: present
+
+    - name: Set Python 3.12 as default alternative
+      shell: |
+        update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 100
+        update-alternatives --set python3 /usr/bin/python3.12
+      args:
+        executable: /bin/bash
+      ignore_errors: yes
+
+    - name: Check if Go is already installed
+      stat:
+        path: "{{ go_install_dir }}/bin/go"
+      register: go_binary
+
+    - name: Remove old Go installation if exists
+      file:
+        path: "{{ go_install_dir }}"
+        state: absent
+      when: go_binary.stat.exists
+
+    - name: Download Go {{ go_version }}
+      get_url:
+        url: "{{ go_download_url }}"
+        dest: /tmp/go{{ go_version }}.linux-amd64.tar.gz
+        mode: '0644'
+
+    - name: Extract Go to /usr/local
+      unarchive:
+        src: /tmp/go{{ go_version }}.linux-amd64.tar.gz
+        dest: /usr/local
+        remote_src: yes
+
+    - name: Add Go to system PATH
+      copy:
+        dest: /etc/profile.d/go.sh
+        content: |
+          export PATH=$PATH:/usr/local/go/bin
+          export GOPATH=$HOME/go
+        mode: '0644'
+
+    - name: Create app user if not exists
+      user:
+        name: "{{ app_user }}"
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Verify installations
+      shell: |
+        source /etc/profile.d/go.sh
+        echo "Python: $(python3.12 --version)"
+        echo "Go: $(go version)"
+      args:
+        executable: /bin/bash
+      register: version_check
+      changed_when: false
+
+    - name: Display versions
+      debug:
+        var: version_check.stdout_lines

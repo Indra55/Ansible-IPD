@@ -1,0 +1,113 @@
+---
+- name: Deploy IPD project to all nodes
+  hosts: all
+  become: yes
+  vars:
+    project_dest: "{{ app_base_dir }}/project"
+  tasks:
+    - name: Create application directory
+      file:
+        path: "{{ app_base_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0755'
+
+    - name: Sync project files to node
+      synchronize:
+        src: "{{ project_src }}/"
+        dest: "{{ project_dest }}"
+        delete: yes
+        rsync_opts:
+          - "--exclude=venv"
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+          - "--exclude=.git"
+          - "--exclude=data"
+      notify: Rebuild binaries
+
+    - name: Set project directory ownership
+      file:
+        path: "{{ project_dest }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        recurse: yes
+
+    - name: Create Python virtual environment
+      command: python3.12 -m venv {{ venv_dir }}
+      args:
+        creates: "{{ venv_dir }}/bin/activate"
+      become_user: "{{ app_user }}"
+
+    - name: Upgrade pip in venv
+      pip:
+        name: pip
+        state: latest
+        virtualenv: "{{ venv_dir }}"
+      become_user: "{{ app_user }}"
+
+    # For controllers - install from list
+    - name: Install Python requirements (controllers)
+      pip:
+        name: "{{ python_requirements }}"
+        virtualenv: "{{ venv_dir }}"
+      become_user: "{{ app_user }}"
+      when: node_role == 'controller'
+
+    # For edges - install from requirements.txt (includes torch)
+    - name: Install Python requirements (edges)
+      pip:
+        requirements: "{{ python_requirements_file }}"
+        virtualenv: "{{ venv_dir }}"
+        extra_args: "--timeout {{ pip_install_timeout }}"
+      become_user: "{{ app_user }}"
+      when: node_role == 'edge'
+      async: 900  # 15 minute timeout for CPU torch
+      poll: 15
+
+    - name: Build Go binaries
+      shell: |
+        source /etc/profile.d/go.sh
+        cd {{ project_dest }}
+        go mod download
+        {% for svc in services if svc.type == 'go' %}
+        go build -o {{ svc.binary }} {{ svc.build_path }}
+        {% endfor %}
+      args:
+        executable: /bin/bash
+        chdir: "{{ project_dest }}"
+      become_user: "{{ app_user }}"
+
+    - name: Create edge startup script
+      template:
+        src: "templates/edge_start.sh.j2"
+        dest: "{{ app_base_dir }}/edge_start.sh"
+        mode: '0755'
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+      when: node_role == 'edge'
+
+    - name: Create systemd service files
+      template:
+        src: "templates/{{ item.name }}.service.j2"
+        dest: "/etc/systemd/system/{{ item.name }}.service"
+        mode: '0644'
+      loop: "{{ services }}"
+      notify: Reload systemd
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Rebuild binaries
+      shell: |
+        source /etc/profile.d/go.sh
+        cd {{ project_dest }}
+        {% for svc in services if svc.type == 'go' %}
+        go build -o {{ svc.binary }} {{ svc.build_path }}
+        {% endfor %}
+      args:
+        executable: /bin/bash
+      become_user: "{{ app_user }}"

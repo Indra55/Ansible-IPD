@@ -1,0 +1,15 @@
+#!/bin/bash
+# Edge startup script - passes required inputs to the interactive Go binary
+
+cd {{ app_base_dir }}/project
+
+# The edge binary asks for:
+# 1. Name of dir to copy into
+# 2. Room ID (will be provided via environment or left for manual input)
+
+# Create the data directory if it doesn't exist
+mkdir -p {{ edge_name }}
+
+# Start the edge binary with the directory name
+# Room ID needs to be set as ENV variable or entered manually
+echo "{{ edge_name }}" | ./edge_node

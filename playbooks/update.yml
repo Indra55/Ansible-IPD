@@ -1,0 +1,36 @@
+---
+- name: Update code and restart services
+  hosts: all
+  become: yes
+  tasks:
+    - name: Sync updated project files
+      synchronize:
+        src: "{{ project_src }}/"
+        dest: "{{ app_base_dir }}/project"
+        delete: yes
+        rsync_opts:
+          - "--exclude=venv"
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+          - "--exclude=.git"
+          - "--exclude=data"
+      register: sync_result
+
+    - name: Rebuild Go binaries if code changed
+      shell: |
+        source /etc/profile.d/go.sh
+        cd {{ app_base_dir }}/project
+        {% for svc in services if svc.type == 'go' %}
+        go build -o {{ svc.binary }} {{ svc.build_path }}
+        {% endfor %}
+      args:
+        executable: /bin/bash
+      become_user: "{{ app_user }}"
+      when: sync_result.changed
+
+    - name: Restart services if code changed
+      systemd:
+        name: "{{ item.name }}"
+        state: restarted
+      loop: "{{ services }}"
+      when: sync_result.changed

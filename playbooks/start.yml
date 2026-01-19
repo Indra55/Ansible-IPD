@@ -1,0 +1,18 @@
+---
+- name: Start IPD services
+  hosts: all
+  become: yes
+  tasks:
+    - name: Start and enable services
+      systemd:
+        name: "{{ item.name }}"
+        state: started
+        enabled: yes
+      loop: "{{ services }}"
+
+    - name: Wait for services to be ready
+      wait_for:
+        port: "{{ item.port }}"
+        timeout: 30
+      loop: "{{ services }}"
+      when: item.port is defined

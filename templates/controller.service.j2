@@ -1,0 +1,18 @@
+[Unit]
+Description=IPD Controller Service
+After=network.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_base_dir }}/project
+ExecStart={{ app_base_dir }}/project/controller
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment="PATH=/usr/local/go/bin:/usr/bin"
+
+[Install]
+WantedBy=multi-user.target

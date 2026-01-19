@@ -1,0 +1,20 @@
+[Unit]
+Description=IPD Edge Node Service
+After=network.target ml_trainer.service
+Requires=ml_trainer.service
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_base_dir }}/project
+ExecStart=/bin/bash {{ app_base_dir }}/edge_start.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment="PATH=/usr/local/go/bin:/usr/bin"
+Environment="EDGE_NAME={{ edge_name }}"
+
+[Install]
+WantedBy=multi-user.target

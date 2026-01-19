@@ -1,0 +1,33 @@
+---
+- name: Check status of all nodes
+  hosts: all
+  become: yes
+  tasks:
+    - name: Check service status
+      systemd:
+        name: "{{ item.name }}"
+      loop: "{{ services }}"
+      register: service_status
+
+    - name: Display service status
+      debug:
+        msg: "{{ item.item.name }}: {{ item.status.ActiveState }}"
+      loop: "{{ service_status.results }}"
+
+    - name: Check listening ports
+      shell: ss -tlnp | grep -E ':(8000|8765)' || true
+      register: ports
+      changed_when: false
+
+    - name: Display listening ports
+      debug:
+        var: ports.stdout_lines
+
+    - name: Check disk space
+      shell: df -h / | tail -1
+      register: disk
+      changed_when: false
+
+    - name: Display disk space
+      debug:
+        var: disk.stdout

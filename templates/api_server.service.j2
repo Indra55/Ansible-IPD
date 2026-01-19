@@ -1,0 +1,17 @@
+[Unit]
+Description=IPD API Server
+After=network.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_base_dir }}/project
+ExecStart={{ venv_dir }}/bin/python main/api_server.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

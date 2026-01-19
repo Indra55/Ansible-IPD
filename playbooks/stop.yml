@@ -1,0 +1,11 @@
+---
+- name: Stop IPD services
+  hosts: all
+  become: yes
+  tasks:
+    - name: Stop services
+      systemd:
+        name: "{{ item.name }}"
+        state: stopped
+      loop: "{{ services }}"
+      ignore_errors: yes
