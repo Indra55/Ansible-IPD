@@ -14,7 +14,7 @@ curl -fsSL https://tailscale.com/install.sh | sh
 
 # Connect to Tailscale network (adjust hostname per node)
 sudo tailscale up \
-  --authkey tskey-auth-k7EeK4bPF211CNTRL-JJdWNLTP8mWNK55M3kXJmWvPGaRKXk7PD \
+  --authkey  \
   --hostname edge-01 \
   --advertise-tags=tag:edge
 
